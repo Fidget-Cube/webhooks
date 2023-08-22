@@ -5,11 +5,12 @@ from bs4 import BeautifulSoup
 import re
 import json
 import traceback
+from time import asctime
 
 dotenv.load_dotenv()
 TEST_URL = os.getenv("TEST_URL")
 PHACK_POST_URL = os.getenv("PHACK_POST_URL")
-PHACK_EVENT_FILE = "past_events.json"
+PHACK_EVENT_FILE = os.getenv("PHACK_EVENT_FILE")
 
 def pacific_hackers_webhook():
     phack_base_url = "https://www.meetup.com"
@@ -71,6 +72,7 @@ def pacific_hackers_webhook():
     return
 
 def main():
+    print(f"{asctime()} : Running Webhook")
     pacific_hackers_webhook()
     return
 

@@ -13,7 +13,6 @@ PHACK_POST_URL = os.getenv("PHACK_POST_URL")
 PHACK_EVENT_FILE = os.getenv("PHACK_EVENT_FILE")
 
 def pacific_hackers_webhook():
-    phack_base_url = "https://www.meetup.com"
     phack_scrape_url = "https://www.meetup.com/pacifichackers/events/"
     past_events = json.load(open(PHACK_EVENT_FILE, "r"))
 
@@ -26,27 +25,20 @@ def pacific_hackers_webhook():
     
     # Parse event details
     soup = BeautifulSoup(res.text, 'html.parser')
-    event_list = soup.find_all("ul", class_="eventList-list")[0].find_all("li", class_="list-item")
+    # Meetup.com likes to change the html, might have to update this
+    event_list = soup.find_all("ul", class_="flex-col")[0]
     events = []
-    for event in event_list:
+    for event in event_list.children:
         try:
-            link = phack_base_url + event.find_all("a", class_="eventCard--link")[0]['href']
-            title = event.find_all("a", class_="eventCardHead--title")[0].string
-            date = event.find_all("span", class_="eventTimeDisplay-startDate")[0].contents[0].string
-            time = event.find_all("span", class_="eventTimeDisplay-startDate")[1].contents[0].string + " PST"
-            descriptions = [desc.contents for desc in event.find_all(class_=re.compile("description-markdown--.+"))]
-            description = ""
-            for item in descriptions:
-                temp = ""
-                for i in item:
-                    if i.string:
-                        temp += i.string
-                description += temp + '\n'
+            link = event.find_all("a")[0]['href']
+            title = event.find_all("span")[0].string
+            datetime = event.find_all("time")[0].contents[0].string
+            descriptions = event.find_all("div", class_=re.compile("utils_cardDescription.+"))[0]
+            description = ''.join(descriptions.strings)
             events.append({
                 "link": link,
                 "title": title,
-                "date": date,
-                "time": time,
+                "datetime": datetime,
                 "description": description
             })
         except:
@@ -60,7 +52,7 @@ def pacific_hackers_webhook():
             continue
         print("New event found, posting...")
         req = {
-            "content": '\n\n'.join([event["title"], event["date"] + ', ' + event["time"], event["description"], event["link"]])
+            "content": '\n\n'.join([event["title"], event["datetime"], event["description"], event["link"]])
         }
         res = requests.post(PHACK_POST_URL, json=req)
         if res.status_code // 100 != 2:

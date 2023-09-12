@@ -58,6 +58,7 @@ def pacific_hackers_webhook():
     for event in events:
         if event in past_events:
             continue
+        print("New event found, posting...")
         req = {
             "content": '\n\n'.join([event["title"], event["date"] + ', ' + event["time"], event["description"], event["link"]])
         }
@@ -66,6 +67,7 @@ def pacific_hackers_webhook():
             print(f"Return Status: {res.status_code}")
             print(res.text)
             return
+        print(f"\"{event['title']}\" posted.")
         past_events.append(event)
 
     json.dump(past_events, open(PHACK_EVENT_FILE, "w"))

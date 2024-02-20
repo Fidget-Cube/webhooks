@@ -34,7 +34,8 @@ def pacific_hackers_webhook():
             title = event.find_all("span")[0].string
             datetime = event.find_all("time")[0].contents[0].string
             descriptions = event.find_all("div", class_=re.compile("utils_cardDescription.+"))[0]
-            description = ''.join(descriptions.strings)
+            # Limit to the first 4 paragraphs
+            description = ''.join(list(descriptions.strings)[:7])
             events.append({
                 "link": link,
                 "title": title,
@@ -48,9 +49,11 @@ def pacific_hackers_webhook():
 
     # Post new events
     for event in events:
-        if event in past_events:
+        if event['link'] in past_events:
             continue
         print("New event found, posting...")
+        # Cannot post to webhook with over 2000 characters
+        event["description"] = event["description"][:1800]
         req = {
             "content": '\n\n'.join([event["title"], event["datetime"], event["description"], event["link"]])
         }
@@ -60,7 +63,7 @@ def pacific_hackers_webhook():
             print(res.text)
             return
         print(f"\"{event['title']}\" posted.")
-        past_events.append(event)
+        past_events.append(event['link'])
 
     json.dump(past_events, open(PHACK_EVENT_FILE, "w"))
     return

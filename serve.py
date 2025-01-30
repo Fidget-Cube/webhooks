@@ -6,15 +6,14 @@ import re
 import json
 import traceback
 from time import asctime
+from datetime import datetime
 
 dotenv.load_dotenv()
-TEST_URL = os.getenv("TEST_URL")
-PHACK_POST_URL = os.getenv("PHACK_POST_URL")
-PHACK_EVENT_FILE = os.getenv("PHACK_EVENT_FILE")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+PHACK_EVENT_FILE = "past_events.json"
 
-def pacific_hackers_webhook():
+def get_pacific_hackers_events():
     phack_scrape_url = "https://www.meetup.com/pacifichackers/events/"
-    past_events = json.load(open(PHACK_EVENT_FILE, "r"))
 
     # Get meetup event
     res = requests.get(phack_scrape_url)
@@ -25,52 +24,67 @@ def pacific_hackers_webhook():
     
     # Parse event details
     soup = BeautifulSoup(res.text, 'html.parser')
-    # Meetup.com likes to change the html, might have to update this
-    event_list = soup.find_all("ul", class_="flex-col")[0]
+    # All the event details are stored in a json script below the html... what????
+    souper = soup.find_all("script", id="__NEXT_DATA__", type="application/json")
+    if len(souper) == 0:
+        print("Failed to drink the soup! '__NEXT_DATA__' script was not found.")
+        return
+    json_soup = json.loads(souper[0].string)
+
     events = []
-    for event in event_list.children:
+    for state_type, val in json_soup["props"]["pageProps"]["__APOLLO_STATE__"].items():
+        if "Event" not in state_type:
+            continue
+        # Loop through every single event in the json
         try:
-            link = event.find_all("a")[0]['href']
-            title = event.find_all("span")[0].string
-            datetime = event.find_all("time")[0].contents[0].string
-            descriptions = event.find_all("div", class_=re.compile("utils_cardDescription.+"))[0]
-            # Limit to the first 4 paragraphs
-            description = ''.join(list(descriptions.strings)[:7])
             events.append({
-                "link": link,
-                "title": title,
-                "datetime": datetime,
-                "description": description
+                "id": val["id"],
+                "link": val["eventUrl"],
+                "title": "## " + val["title"],
+                "datetime": "### " + datetime.fromisoformat(val["dateTime"]).strftime('%a %d %b %Y, %I:%M%p'),
+                "description": '\n\n'.join(val["description"].split('\n\n')[:6])    # Only keep the first 6 paragraphs
             })
         except:
             print("Failure while parsing event.")
-            print(event.prettify())
+            print(json.dumps(val, indent=4))
             traceback.print_exc()
+    
+    return events
+    
 
+def post_to_discord(events):
+    if os.path.exists(PHACK_EVENT_FILE):
+        past_events = json.load(open(PHACK_EVENT_FILE, "r"))
+    else:
+        past_events = []
+    
     # Post new events
     for event in events:
-        if event['link'] in past_events:
+        if event["id"] in past_events:
             continue
         print("New event found, posting...")
         # Cannot post to webhook with over 2000 characters
         event["description"] = event["description"][:1800]
         req = {
-            "content": '\n\n'.join([event["title"], event["datetime"], event["description"], event["link"]])
+            "content": '\n'.join([event["title"], event["datetime"], event["description"], event["link"]])
         }
-        res = requests.post(PHACK_POST_URL, json=req)
+        res = requests.post(WEBHOOK_URL, json=req)
         if res.status_code // 100 != 2:
             print(f"Return Status: {res.status_code}")
             print(res.text)
             return
         print(f"\"{event['title']}\" posted.")
-        past_events.append(event['link'])
+        past_events.append(event["id"])
 
     json.dump(past_events, open(PHACK_EVENT_FILE, "w"))
     return
 
+
 def main():
-    print(f"{asctime()} : Running Webhook")
-    pacific_hackers_webhook()
+    print(f"{asctime()} : Getting Event Info")
+    event_data = get_pacific_hackers_events()
+    print(f"{asctime()} : Posting Event data to Discord")
+    post_to_discord(event_data)
     return
 
 if __name__ == "__main__":

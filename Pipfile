@@ -7,6 +7,3 @@ name = "pypi"
 beautifulsoup4 = "*"
 
 [dev-packages]
-
-[requires]
-python_version = "3.*"

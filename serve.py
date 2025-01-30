@@ -1,5 +1,4 @@
 import requests
-import dotenv
 import os
 from bs4 import BeautifulSoup
 import re
@@ -8,7 +7,6 @@ import traceback
 from time import asctime
 from datetime import datetime
 
-dotenv.load_dotenv()
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 PHACK_EVENT_FILE = "past_events.json"
 
